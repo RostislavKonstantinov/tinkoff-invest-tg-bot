@@ -1,0 +1,4 @@
+.idea
+*.pyc
+*.pid
+.DS_Store

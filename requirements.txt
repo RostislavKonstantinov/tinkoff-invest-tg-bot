@@ -1,0 +1,4 @@
+--extra-index-url https://test.pypi.org/simple/
+python-telegram-bot==12.2.0
+tinkoff-invest-openapi-client==0.0.4
+pytz==2018.4
