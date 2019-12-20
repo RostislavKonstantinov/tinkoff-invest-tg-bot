@@ -12,6 +12,10 @@ def webhook(request):
         update = telegram.Update.de_json(request.get_json(force=True), bot)
         chat_id = update.message.chat.id
         token = update.message.text
-        calculator = InvestCalculator(get_tinkoff_invest_client(token))
-        bot.sendMessage(chat_id=chat_id, text=calculator.get_statistics_str())
+        try:
+            calculator = InvestCalculator(get_tinkoff_invest_client(token))
+            message = calculator.get_statistics_str()
+        except Exception:
+            message = 'Token is invalid!'
+        bot.sendMessage(chat_id=chat_id, text=message)
     return "ok"

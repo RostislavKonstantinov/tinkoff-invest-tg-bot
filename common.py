@@ -14,8 +14,17 @@ def get_tinkoff_invest_client(token):
     return openapi.api_client(token)
 
 
+def amount_emoji(amount: float) -> str:
+    emoji = '✅' if amount >= 0 else '❗'
+    return f'{round(amount,2)}{emoji}'
+
+
 def format_dict(data: Dict):
     return '; '.join(f'{k}: {v}' for k, v in data.items())
+
+
+def format_dict_with_emoji(data: Dict):
+    return '; '.join(f'{k}: {amount_emoji(v)}' for k, v in data.items())
 
 
 class InvestCalculator:
@@ -111,14 +120,19 @@ class InvestCalculator:
 
         return profit
 
-    def get_statistics_str(self) -> str:
+    def get_statistics(self) -> Dict[str, str]:
         profit = self.get_profit()
-        message = f"Commissions and Taxes -> {format_dict(self.get_commissions())}\n" \
-                  f"Pay In -> {format_dict(self.get_pay_in())}\n" \
-                  f"Pay Out {format_dict(self.get_pay_out())}\n" \
-                  f"Pay Total -> {format_dict(self.get_pay_total())}\n" \
-                  f"Operations -> {format_dict(self.get_total_operations_balance())}\n" \
-                  f"Total Profit -> {sum(profit.values())}\n" \
-                  f"Detailed Profit -> {format_dict(profit)}"
+        total_profit = sum(profit.values())
+        return {
+            "Commissions and Taxes": format_dict(self.get_commissions()),
+            "Pay In": format_dict(self.get_pay_in()),
+            "Pay Out": format_dict(self.get_pay_out()),
+            "Pay Total": format_dict(self.get_pay_total()),
+            "Operations": format_dict(self.get_total_operations_balance()),
+            "Balance": format_dict(self.get_balance()),
+            "Total Profit": amount_emoji(total_profit),
+            "Detailed Profit": format_dict_with_emoji(profit)
+        }
 
-        return message
+    def get_statistics_str(self) -> str:
+        return '\n'.join(f'{k} -> {v}' for k, v in self.get_statistics().items())
