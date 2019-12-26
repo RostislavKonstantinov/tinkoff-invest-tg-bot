@@ -1,10 +1,10 @@
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List, Callable, Union
+from typing import Dict, List, Callable, Union, Iterator
 
 # https://github.com/Awethon/open-api-python-client?files=1
 from openapi_client import openapi
-from openapi_genclient import Operation, OperationTypeWithCommission, Currency
+from openapi_genclient import Operation, OperationTypeWithCommission, Currency, InstrumentType
 from pytz import timezone, utc
 
 DEFAULT_CURRENCY = Currency.RUB
@@ -15,8 +15,8 @@ def get_tinkoff_invest_client(token):
 
 
 def amount_emoji(amount: float) -> str:
-    emoji = '✅' if amount >= 0 else '❗'
-    return f'{round(amount,2)}{emoji}'
+    emoji = '✅' if amount >= 0 else '❌'
+    return f'{round(amount, 2)}{emoji}'
 
 
 def format_dict(data: Dict):
@@ -52,9 +52,12 @@ class InvestCalculator:
             _from=self.date_from.isoformat(), to=self.date_to.isoformat()
         ).payload.operations
 
+    def get_operations_by_filter(self, func: Union[Callable, None] = None) -> Iterator[Operation]:
+        return filter(func, self.operations)
+
     def get_total_payment_by_filter(self, func: Union[Callable, None] = None) -> Dict[str, float]:
         result = defaultdict(float)
-        for operation in filter(func, self.operations):
+        for operation in self.get_operations_by_filter(func):
             result[operation.currency] += operation.payment
         return result
 
@@ -100,14 +103,14 @@ class InvestCalculator:
         ).get(DEFAULT_CURRENCY, 0.0)
 
         figi_total = defaultdict(float)
-        for operation in filter(
+        for operation in self.get_operations_by_filter(
                 lambda o: (
                         o.currency == DEFAULT_CURRENCY and
                         o.operation_type in (
                                 OperationTypeWithCommission.BUY, OperationTypeWithCommission.SELL, 'BuyCard') and
-                        o.payment != 0
-                ),
-                self.operations
+                        o.payment != 0 and
+                        o.instrument_type != InstrumentType.CURRENCY
+                )
         ):
             figi_total[operation.figi] += operation.payment + operation.commission.value
 
