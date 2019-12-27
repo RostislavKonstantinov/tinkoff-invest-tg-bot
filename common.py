@@ -64,6 +64,10 @@ class InvestCalculator:
     def get_commissions(self) -> Dict[str, float]:
         return self.get_total_payment_by_filter(lambda o: o.operation_type in self.commission_operations_types)
 
+    def get_service_commission(self):
+        return self.get_total_payment_by_filter(
+            lambda o: o.operation_type == OperationTypeWithCommission.SERVICECOMMISSION)
+
     def get_pay_in(self):
         return self.get_total_payment_by_filter(lambda o: o.operation_type == OperationTypeWithCommission.PAYIN)
 
@@ -125,9 +129,10 @@ class InvestCalculator:
 
     def get_statistics(self) -> Dict[str, str]:
         profit = self.get_profit()
-        total_profit = sum(profit.values())
+        total_profit = sum(profit.values()) + self.get_service_commission().get(DEFAULT_CURRENCY, 0)
         return {
             "Commissions and Taxes": format_dict(self.get_commissions()),
+            "Service commissions": format_dict(self.get_service_commission()),
             "Pay In": format_dict(self.get_pay_in()),
             "Pay Out": format_dict(self.get_pay_out()),
             "Pay Total": format_dict(self.get_pay_total()),
