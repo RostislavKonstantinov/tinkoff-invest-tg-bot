@@ -144,3 +144,16 @@ class InvestCalculator:
 
     def get_statistics_str(self) -> str:
         return '\n'.join(f'{k} -> {v}' for k, v in self.get_statistics().items())
+
+    def get_portfolio_info(self):
+        result = list()
+        for item in self.client.portfolio.portfolio_get().payload.positions:
+            result.append({
+                'ticker': item.ticker,
+                'name': self.get_name_by_figi(item.figi),
+                'currency': item.average_position_price.currency,
+                'current_total': round(item.average_position_price.value * item.balance + item.expected_yield.value, 2),
+                'lots': item.balance,
+                'avg_price': item.average_position_price.value,
+            })
+        return result
