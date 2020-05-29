@@ -116,7 +116,7 @@ class InvestCalculator:
                         o.instrument_type != InstrumentType.CURRENCY
                 )
         ):
-            figi_total[operation.figi] += operation.payment + operation.commission.value
+            figi_total[operation.figi] += operation.payment + getattr(operation.commission, 'value', 0)
 
         figi_in_portfolio = {
             f.figi: f.ticker for f in self.client.portfolio.portfolio_get().payload.positions
@@ -131,15 +131,15 @@ class InvestCalculator:
         profit = self.get_profit()
         total_profit = sum(profit.values()) + self.get_service_commission().get(DEFAULT_CURRENCY, 0)
         return {
-            "Commissions and Taxes": format_dict(self.get_commissions()),
-            "Service commissions": format_dict(self.get_service_commission()),
-            "Pay In": format_dict(self.get_pay_in()),
-            "Pay Out": format_dict(self.get_pay_out()),
-            "Pay Total": format_dict(self.get_pay_total()),
-            "Operations": format_dict(self.get_total_operations_balance()),
-            "Balance": format_dict(self.get_balance()),
-            "Total Profit": amount_emoji(total_profit),
-            "Detailed Profit": format_dict_with_emoji(profit)
+            'Commissions and Taxes': format_dict(self.get_commissions()),
+            'Service commissions': format_dict(self.get_service_commission()),
+            'Pay In': format_dict(self.get_pay_in()),
+            'Pay Out': format_dict(self.get_pay_out()),
+            'Pay Total': format_dict(self.get_pay_total()),
+            'Operations': format_dict(self.get_total_operations_balance()),
+            'Balance': format_dict(self.get_balance()),
+            'Total Profit': amount_emoji(total_profit),
+            'Detailed Profit': format_dict_with_emoji(profit)
         }
 
     def get_statistics_str(self) -> str:
