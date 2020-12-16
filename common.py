@@ -24,7 +24,13 @@ def format_dict(data: Dict):
 
 
 def format_dict_with_emoji(data: Dict):
-    return '; '.join(f'{k}: {amount_emoji(v)}' for k, v in data.items())
+    result = ''
+    for name, value in data.items():
+        if isinstance(value, dict):
+            result += f'{name}: {format_dict_with_emoji(value)}'
+        elif isinstance(value, float):
+            result += f'{name}: {amount_emoji(value)}; '
+    return result
 
 
 class InvestCalculator:
@@ -84,61 +90,70 @@ class InvestCalculator:
 
     def get_total_operations_balance(self):
         return self.get_total_payment_by_filter(
-            lambda o: (
-                    o.currency == DEFAULT_CURRENCY and
-                    o.operation_type in (OperationTypeWithCommission.BUY, OperationTypeWithCommission.SELL, 'BuyCard')
-            )
+            lambda o: o.operation_type in (OperationTypeWithCommission.BUY, OperationTypeWithCommission.SELL, 'BuyCard')
         )
 
     def get_name_by_figi(self, figi):
         position = self.client.market.market_search_by_figi_get(figi).payload
         return f'{position.ticker} - {position.name} ({figi})'
 
-    def get_profit(self) -> Dict[str, float]:
+    def get_profit(self) -> Dict[str, Dict[str, float]]:
         profit = dict()
         profit['dividend'] = self.get_total_payment_by_filter(
-            lambda o: (o.operation_type in (
-                OperationTypeWithCommission.DIVIDEND, OperationTypeWithCommission.TAXDIVIDEND)
-                       and o.currency == DEFAULT_CURRENCY)
-        ).get(DEFAULT_CURRENCY, 0.0)
+            lambda o: o.operation_type in (
+                OperationTypeWithCommission.DIVIDEND, OperationTypeWithCommission.TAXDIVIDEND,
+            )
+        )
         profit['coupon'] = self.get_total_payment_by_filter(
-            lambda o: (o.operation_type in (OperationTypeWithCommission.COUPON, OperationTypeWithCommission.TAXCOUPON)
-                       and o.currency == DEFAULT_CURRENCY)
-        ).get(DEFAULT_CURRENCY, 0.0)
+            lambda o: o.operation_type in (OperationTypeWithCommission.COUPON, OperationTypeWithCommission.TAXCOUPON)
+        )
 
-        figi_total = defaultdict(float)
+        figi_total = defaultdict(lambda: defaultdict(float))
         for operation in self.get_operations_by_filter(
-                lambda o: (
-                        o.currency == DEFAULT_CURRENCY and
-                        o.operation_type in (
-                                OperationTypeWithCommission.BUY, OperationTypeWithCommission.SELL, 'BuyCard') and
-                        o.payment != 0 and
-                        o.instrument_type != InstrumentType.CURRENCY
+                lambda o: (o.operation_type in (
+                        OperationTypeWithCommission.BUY, OperationTypeWithCommission.SELL, 'BuyCard') and
+                           o.instrument_type != InstrumentType.CURRENCY
                 )
         ):
-            figi_total[operation.figi] += operation.payment + getattr(operation.commission, 'value', 0)
+            figi_total[operation.figi][operation.currency] += operation.payment + getattr(
+                operation.commission, 'value', 0)
 
         figi_in_portfolio = {
-            f.figi: f.ticker for f in self.client.portfolio.portfolio_get().payload.positions
+            f.figi: (f.ticker, f.balance * f.average_position_price.value + f.expected_yield.value,
+                     f.average_position_price.currency)
+            for f in self.client.portfolio.portfolio_get().payload.positions
         }
-        for figi, p_sum in figi_total.items():
-            if figi not in figi_in_portfolio:
-                profit[self.get_name_by_figi(figi)] = p_sum
+
+        for figi, currency_sum in figi_total.items():
+            for currency,  p_sum in currency_sum.items():
+                if figi not in figi_in_portfolio:
+                    profit[self.get_name_by_figi(figi)] = {currency: p_sum}
+                elif figi_in_portfolio[figi][2] == currency:
+                    profit[self.get_name_by_figi(figi)] = {currency: p_sum + figi_in_portfolio[figi][1]}
 
         return profit
 
     def get_statistics(self) -> Dict[str, str]:
+        service_comission = self.get_service_commission()
+        comission = self.get_commissions()
         profit = self.get_profit()
-        total_profit = sum(profit.values()) + self.get_service_commission().get(DEFAULT_CURRENCY, 0)
+        total_profit = defaultdict(float)
+        for figi, cur_val in profit.items():
+            for currency, value in cur_val.items():
+                total_profit[currency] += value
+
+        for currency in total_profit.keys():
+            total_profit[currency] += service_comission[currency]
+
         return {
-            'Commissions and Taxes': format_dict(self.get_commissions()),
-            'Service commissions': format_dict(self.get_service_commission()),
+            'Commissions and Taxes': format_dict(comission),
+            'Service commissions': format_dict(service_comission),
             'Pay In': format_dict(self.get_pay_in()),
             'Pay Out': format_dict(self.get_pay_out()),
             'Pay Total': format_dict(self.get_pay_total()),
             'Operations': format_dict(self.get_total_operations_balance()),
             'Balance': format_dict(self.get_balance()),
-            'Total Profit': amount_emoji(total_profit),
+            'Total Profit': format_dict_with_emoji(total_profit),
             'Detailed Profit': format_dict_with_emoji(profit)
         }
 
